@@ -22,15 +22,12 @@ def gen_data():
 
     return data_array
 
-
-
+# --- Main Execution ---
 if __name__ == "__main__":
-
     print("Program start:\n")
 
     if not os.path.exists(OUTPUT_DATA_CSV):
         print(f"CSV data not found at {OUTPUT_DATA_CSV}\n")
-        print("Training/test data file does not exist yet, generating...\n")
         dataA = gen_data()
     else:
         dataA = []
