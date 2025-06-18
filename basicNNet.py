@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import os
+import csv
 
 OUTPUT_DATA_CSV = "/Users/ab/Projects/Basic-Neural-Network/generated_output.csv"
 
@@ -17,12 +18,9 @@ def gen_data():
     for i in range(50001):
         x = generate_random_in_range()
         data_array.append((x,0 if x < 0.5 else 1))
-
-    np.save(OUTPUT_DATA_CSV,data_array)
-
+    
     return data_array
 
-# --- Main Execution ---
 if __name__ == "__main__":
     print("Program start:\n")
 
