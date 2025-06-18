@@ -38,9 +38,17 @@ def gen_data():
 def train_network(training_data):
     # Loop through input datapoints:
     for i in range(0,len(training_data)):
-        # Forward pass
+        # Forward pass of input with L1 weights
         L1_array = training_data[i]['X_Value'] * W1 + bias1
+        # Activation function for hidden layer
+        a1 = sigmoid(L1_array)
+        # Matrix multiply with W2 and add second bias
+        a2 = a1 @ W2 + bias2
 
+        Y_mse = 0.5 * (a2 - training_data[i]['Z_Label']) ** 2
+
+def sigmoid(in_matrix):
+    return 1 / (1 + np.exp(-(in_matrix)))
 
 if __name__ == "__main__":
     print("Program start:\n")
