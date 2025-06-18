@@ -10,12 +10,19 @@ input_dim = 1
 hidden_layer_dim = 10
 output_dim = 1
 
+W1 = np.random.randn(input_dim, hidden_layer_dim) * np.sqrt(2.0 / (input_dim + hidden_layer_dim))
+bias1 = np.zeros((input_dim, hidden_layer_dim))
+W2 = np.random.randn(hidden_layer_dim, output_dim) * np.sqrt(2.0 / (hidden_layer_dim + output_dim))
+bias2 = np.zeros((1, output_dim))
+
+
 def generate_random_in_range():
     while True:
         r = random.random()
 
         if (0 < r <= 0.25) or (0.75 <= r < 1.0):
             return r
+
 
 def gen_data():
     data_array = []
@@ -39,16 +46,30 @@ def train_network(training_data):
     # Loop through input datapoints:
     for i in range(0,len(training_data)):
         # Forward pass of input with L1 weights
-        L1_array = training_data[i]['X_Value'] * W1 + bias1
+        Z1 = np.array([[training_data[i]['X_Value']]]) @ W1 + bias1
         # Activation function for hidden layer
-        a1 = sigmoid(L1_array)
+        A1 = sigmoid(Z1)
         # Matrix multiply with W2 and add second bias
-        a2 = a1 @ W2 + bias2
+        Z2 = A1 @ W2 + bias2
 
-        Y_mse = 0.5 * (a2 - training_data[i]['Z_Label']) ** 2
+        A2 = sigmoid(Z2)
+
+        Y_mse = 0.5 * (np.array([[training_data[i]['Z_Label']]]) - A2) ** 2
+        dL_dZ2 = -(np.array([[training_data[i]['Z_Label']]]) - A2) * d_sigmoid(Z2)
+
+        dLdW2 = dL_dZ2 * A1
+        dLdb2 = dL_dZ2
+        dLdW1 = dL_dZ2 * W2 * d_sigmoid(Z1) * training_data[i]['X_Value']
+        dLdb1 = dL_dZ2 * W2 * d_sigmoid(Z1)
+
 
 def sigmoid(in_matrix):
     return 1 / (1 + np.exp(-(in_matrix)))
+
+
+def d_sigmoid(y):
+    return sigmoid(y) * (1 - sigmoid(y))
+
 
 if __name__ == "__main__":
     print("Program start:\n")
@@ -62,9 +83,6 @@ if __name__ == "__main__":
         dataA = np.loadtxt(OUTPUT_DATA_CSV, delimiter=',', dtype={'names': ('X_Value', 'Z_Label'),
                                                                     'formats': ('f8', 'i4')})
 
-    W1 = np.random.randn(input_dim, hidden_layer_dim) * np.sqrt(2.0 / (input_dim + hidden_layer_dim))
-    bias1 = np.zeros((input_dim, hidden_layer_dim))
-    W2 = np.random.randn(hidden_layer_dim, output_dim) * np.sqrt(2.0 / (hidden_layer_dim + output_dim))
-    bias2 = np.zeros((1, output_dim))
+    
 
 
