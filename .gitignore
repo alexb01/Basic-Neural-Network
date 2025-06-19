@@ -1,3 +1,4 @@
 *.csv
 generate_embeddings.py
 venv-nn
+*.npy

@@ -31,7 +31,7 @@ def gen_data(range_val):
 
     for i in range(range_val):
         x = generate_random_in_range()
-        data_array.append((x,0 if x < 0.5 else 1))
+        data_array.append((x,0 if x > 0.5 else 1))
     
     numpy_array_to_save = np.array(data_array, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     TRAINING_DATA_SIZE = 50001
     num_epochs = 10000
-    learning_rate = 0.08
+    learning_rate = 0.05
 
     if not os.path.exists(OUTPUT_DATA_CSV):
         print(f"CSV data not found at {OUTPUT_DATA_CSV}\n")
@@ -141,11 +141,12 @@ if __name__ == "__main__":
                                                                     'formats': ('f8', 'i4')})
 
     print(f"Training for {num_epochs} epochs with learning rate {learning_rate}\n")
-    for epoch in range(num_epochs):
+    for epoch in range(num_epochs+1):
     # Pass the weights/biases by reference, as train_network modifies them
     # (remove .copy() if you want to modify in place, which is common for training)
         W1, bias1, W2, bias2 = train_network(dataA, W1, bias1, W2, bias2, learning_rate)
-        if (epoch + 1) % 50 == 0:
+        if (epoch) % 50 == 0 and not (epoch) % 100 == 0:
+            # Print epoch every 50 epochs, but not every 100 since the average loss if-then branch below already does it.
             print(f"Epoch: {epoch}")
         # Optional: Print loss every N epochs to monitor progress
         if (epoch + 1) % 100 == 0: # Print every 100 epochs
