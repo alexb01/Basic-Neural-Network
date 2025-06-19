@@ -3,7 +3,7 @@ import random
 import os
 import csv
 
-OUTPUT_DATA_CSV = "/Users/ab/Projects/Basic-Neural-Network/blank.csv"
+OUTPUT_DATA_CSV = "/Users/ab/Projects/Basic-Neural-Network/test_data_for_basicNN.csv"
 
 # Network dimensions
 input_dim = 1
@@ -22,7 +22,7 @@ def gen_test_data(num):
     data_array = []
     for i in range(num):
         x = generate_random_in_range()
-        data_array.append((x,0 if x < 0.5 else 1))
+        data_array.append((x,0 if x > 0.5 else 1))
 
     return np.array(data_array, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
 
@@ -127,8 +127,8 @@ if __name__ == "__main__":
     bias2 = np.zeros((1, output_dim))
 
     TRAINING_DATA_SIZE = 50001
-    num_epochs = 250
-    learning_rate = 0.05
+    num_epochs = 10000
+    learning_rate = 0.08
 
     if not os.path.exists(OUTPUT_DATA_CSV):
         print(f"CSV data not found at {OUTPUT_DATA_CSV}\n")
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     print(test_array)
 
     print("\n--- Running network on test data ---")
-    res1 = run_network(test_array, trained_W1, trained_bias1, trained_W2, trained_bias2)
+    res1 = run_network(test_array, W1, bias1, W2, bias2)
     
     print("\nProgram finished.")
 
