@@ -145,9 +145,10 @@ if __name__ == "__main__":
     # Pass the weights/biases by reference, as train_network modifies them
     # (remove .copy() if you want to modify in place, which is common for training)
         W1, bias1, W2, bias2 = train_network(dataA, W1, bias1, W2, bias2, learning_rate)
-        print(f"Epoch: {epoch}")
+        if (epoch + 1) % 50 == 0:
+            print(f"Epoch: {epoch}")
         # Optional: Print loss every N epochs to monitor progress
-        if (epoch + 1) % 50 == 0: # Print every 50 epochs
+        if (epoch + 1) % 100 == 0: # Print every 100 epochs
             # Calculate average loss for the entire training set
             total_loss = 0
             for i in range(len(dataA)):
