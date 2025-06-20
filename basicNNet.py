@@ -44,45 +44,63 @@ def gen_data(range_val):
     return numpy_array_to_save
 
 
-def train_network(training_data, W1, bias1, W2, bias2, learning_rate=0.01):
-    
-    grad_W1 = np.zeros_like(W1)
-    grad_bias1 = np.zeros_like(bias1)
-    grad_W2 = np.zeros_like(W2)
-    grad_bias2 = np.zeros_like(bias2)
+def train_network(training_data, W1, bias1, W2, bias2, learning_rate=0.05, batch_size=32):
 
     num_samples = len(training_data)
+    num_batches = (num_samples + batch_size - 1) // batch_size
+    leftover_datapoints = num_samples % batch_size
+
+    total_epoch_loss = 0
     
+    shuffled_indices = np.random.permutation(num_samples)
+    shuffled_training_data = training_data[shuffled_indices]
+
     # Loop through input datapoints:
-    for i in range(0,len(training_data)):
-        # Forward pass of input with L1 weights
-        Z1 = np.array([[training_data[i]['X_Value']]]) @ W1 + bias1
-        # Activation function for hidden layer
-        A1 = sigmoid(Z1)
-        # Matrix multiply with W2 and add second bias
-        Z2 = A1 @ W2 + bias2
+    for i in range(num_batches):
+        # i represents each batch
+        start_idx = i * batch_size
+        end_idx = min((i + 1) * batch_size, num_samples) # Ensure we don't go out of bounds for the last batch
+        
+        current_batch = shuffled_training_data[start_idx:end_idx]
+        current_batch_size = len(current_batch) # Actual size of this batch (can be less than batch_size)
 
-        A2 = sigmoid(Z2)
+        # Instantiate zero vectors for new weight and bias batch
+        grad_W1_batch = np.zeros_like(W1)
+        grad_bias1_batch = np.zeros_like(bias1)
+        grad_W2_batch = np.zeros_like(W2)
+        grad_bias2_batch = np.zeros_like(bias2)
 
-        L = 0.5 * (np.array([[training_data[i]['Z_Label']]]) - A2) ** 2
-        dL_dZ2 = -(np.array([[training_data[i]['Z_Label']]]) - A2) * d_sigmoid(Z2) # dL/dA2 * d_sigmoid(Z2)
+        for j in range(current_batch_size):
+            
+            # --- Forward pass ---
+            Z1 = np.array([[current_batch[j]['X_Value']]]) @ W1 + bias1
+            A1 = sigmoid(Z1)
+            Z2 = A1 @ W2 + bias2
+            A2 = sigmoid(Z2)
 
-        dLdW2 = A1.T @ dL_dZ2
-        dLdb2 = dL_dZ2
-        dLdW1 = np.array([[training_data[i]['X_Value']]]).T @ (dL_dZ2 @ W2.T * d_sigmoid(Z1))
-        dLdb1 = dL_dZ2 @ W2.T * d_sigmoid(Z1)
+            L = 0.5 * (np.array([[current_batch[j]['Z_Label']]]) - A2) ** 2
+            total_epoch_loss += np.sum(L)
 
-        grad_W1 += dLdW1
-        grad_bias1 += dLdb1
-        grad_W2 += dLdW2
-        grad_bias2 += dLdb2
+            dL_dZ2 = -(np.array([[current_batch[j]['Z_Label']]]) - A2) * d_sigmoid(Z2) # dL/dA2 * d_sigmoid(Z2)
 
-    W1 -= learning_rate * (grad_W1 / num_samples)
-    bias1 -= learning_rate * (grad_bias1 / num_samples)
-    W2 -= learning_rate * (grad_W2 / num_samples)
-    bias2 -= learning_rate * (grad_bias2 / num_samples)
+            dLdW2 = A1.T @ dL_dZ2
+            dLdb2 = dL_dZ2
+            dLdW1 = np.array([[current_batch[j]['X_Value']]]).T @ (dL_dZ2 @ W2.T * d_sigmoid(Z1))
+            dLdb1 = dL_dZ2 @ W2.T * d_sigmoid(Z1)
 
-    return W1, bias1, W2, bias2
+            grad_W1_batch += dLdW1
+            grad_bias1_batch += dLdb1
+            grad_W2_batch += dLdW2
+            grad_bias2_batch += dLdb2
+
+        W1 -= learning_rate * (grad_W1_batch / current_batch_size)
+        bias1 -= learning_rate * (grad_bias1_batch / current_batch_size)
+        W2 -= learning_rate * (grad_W2_batch / current_batch_size)
+        bias2 -= learning_rate * (grad_bias2_batch / current_batch_size)
+
+        avg_epoch_loss = total_epoch_loss // num_batches
+
+    return W1, bias1, W2, bias2, avg_epoch_loss
 
 
 def run_network(input_data, W1, bias1, W2, bias2):
@@ -144,10 +162,10 @@ if __name__ == "__main__":
     for epoch in range(num_epochs+1):
     # Pass the weights/biases by reference, as train_network modifies them
     # (remove .copy() if you want to modify in place, which is common for training)
-        W1, bias1, W2, bias2 = train_network(dataA, W1, bias1, W2, bias2, learning_rate)
+        W1, bias1, W2, bias2, epoch_loss = train_network(dataA, W1, bias1, W2, bias2, learning_rate)
         if (epoch) % 50 == 0 and not (epoch) % 100 == 0:
             # Print epoch every 50 epochs, but not every 100 since the average loss if-then branch below already does it.
-            print(f"Epoch: {epoch}")
+            print(f"Epoch: {epoch}, epoch loss: {epoch_loss}")
         # Optional: Print loss every N epochs to monitor progress
         if (epoch + 1) % 100 == 0: # Print every 100 epochs
             # Calculate average loss for the entire training set
