@@ -2,13 +2,13 @@ import numpy as np
 import random
 import os
 import csv
-
-OUTPUT_DATA_CSV = "/Users/ab/Projects/Basic-Neural-Network/test_data_for_basicNN.csv"
+import argparse
 
 # Network dimensions
 input_dim = 1
 hidden_layer_dim = 10
 output_dim = 1
+
 
 def generate_random_in_range():
     while True:
@@ -26,6 +26,7 @@ def gen_test_data(num):
 
     return np.array(data_array, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
 
+
 def gen_data(range_val):
     data_array = []
 
@@ -33,15 +34,9 @@ def gen_data(range_val):
         x = generate_random_in_range()
         data_array.append((x,0 if x > 0.5 else 1))
     
-    numpy_array_to_save = np.array(data_array, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
+    numpy_gen_data_array = np.array(data_array, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
 
-    # delimiter=',' specifies CSV format
-    # fmt='%f,%d' specifies the format for each column: float for the first, integer for the second
-    np.savetxt(OUTPUT_DATA_CSV, numpy_array_to_save, delimiter=',', fmt='%f,%d')
-    # If your second column could also be a float, you might use fmt='%.8f,%.0f' or just '%.8f,%.8f'
-    # Or for mixed types, sometimes '%s' works, but '%f,%d' is explicit and better.
-
-    return numpy_array_to_save
+    return numpy_gen_data_array
 
 
 def train_network(training_data, W1, bias1, W2, bias2, learning_rate=0.05, batch_size=32):
@@ -98,7 +93,7 @@ def train_network(training_data, W1, bias1, W2, bias2, learning_rate=0.05, batch
         W2 -= learning_rate * (grad_W2_batch / current_batch_size)
         bias2 -= learning_rate * (grad_bias2_batch / current_batch_size)
 
-        avg_epoch_loss = total_epoch_loss // num_batches
+        avg_epoch_loss = total_epoch_loss / num_batches
 
     return W1, bias1, W2, bias2, avg_epoch_loss
 
@@ -108,6 +103,7 @@ def run_network(input_data, W1, bias1, W2, bias2):
     num_samples = len(input_data)
     
     results = []
+    wrong_counter = 0
 
     # Loop through input datapoints:
     for i in range(0,num_samples):
@@ -122,8 +118,15 @@ def run_network(input_data, W1, bias1, W2, bias2):
 
         A2 = sigmoid(Z2)
 
-        print(f"Predicted probability for input {x_current[0][0]:.4f}: {A2[0][0]:.4f}")
-        results.append(A2[0][0])
+        # Floor or ceiling depending on value:
+        pressed_val = (np.ceil(A2) if A2 > 0.9 else np.floor(A2))
+
+        if int(pressed_val[0][0]) != input_data[i]['Z_Label']:
+            wrong_counter += 1
+        # print(f"Predicted probability for input {x_current[0][0]:.4f}: {int(pressed_val[0][0])} || {input_data[i]['Z_Label']} actual")
+        results.append(pressed_val[0][0])
+
+    print(f"{wrong_counter} results wrong in {num_samples} test data points.\n")
 
     return results
 
@@ -139,52 +142,51 @@ def d_sigmoid(x):
 if __name__ == "__main__":
     print("Program start:\n")
 
+    # --- Parse arguments ---
+    parser = argparse.ArgumentParser(description="A simple greeting script.")
+    parser.add_argument("num_epochs", type=int, default=100, help="The number of training epochs")
+    parser.add_argument("test_datapoints", type=int, default=50, help="The number of test data points")
+    parser.add_argument("l_rate", type=float, default=0.05, help="The learning rate for the network")
+    args = parser.parse_args()
+
     W1 = np.random.randn(input_dim, hidden_layer_dim) * np.sqrt(2.0 / (input_dim + hidden_layer_dim))
     bias1 = np.zeros((input_dim, hidden_layer_dim))
     W2 = np.random.randn(hidden_layer_dim, output_dim) * np.sqrt(2.0 / (hidden_layer_dim + output_dim))
     bias2 = np.zeros((1, output_dim))
 
     TRAINING_DATA_SIZE = 50001
-    num_epochs = 10000
-    learning_rate = 0.05
+    num_epochs = args.num_epochs
+    learning_rate = args.l_rate
 
-    if not os.path.exists(OUTPUT_DATA_CSV):
-        print(f"CSV data not found at {OUTPUT_DATA_CSV}\n")
-        dataA_list = gen_data(TRAINING_DATA_SIZE)
-        dataA = np.array(dataA_list, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
-    else:
-        # Open the existing file:
-        print(f"CSV data found at {OUTPUT_DATA_CSV}, loading...\n")
-        dataA = np.loadtxt(OUTPUT_DATA_CSV, delimiter=',', dtype={'names': ('X_Value', 'Z_Label'),
-                                                                    'formats': ('f8', 'i4')})
+    dataA_list = gen_data(TRAINING_DATA_SIZE)
+    dataA = np.array(dataA_list, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
+
 
     print(f"Training for {num_epochs} epochs with learning rate {learning_rate}\n")
     for epoch in range(num_epochs+1):
     # Pass the weights/biases by reference, as train_network modifies them
     # (remove .copy() if you want to modify in place, which is common for training)
         W1, bias1, W2, bias2, epoch_loss = train_network(dataA, W1, bias1, W2, bias2, learning_rate)
-        if (epoch) % 50 == 0 and not (epoch) % 100 == 0:
-            # Print epoch every 50 epochs, but not every 100 since the average loss if-then branch below already does it.
-            print(f"Epoch: {epoch}, epoch loss: {epoch_loss}")
-        # Optional: Print loss every N epochs to monitor progress
-        if (epoch + 1) % 100 == 0: # Print every 100 epochs
-            # Calculate average loss for the entire training set
-            total_loss = 0
-            for i in range(len(dataA)):
-                x_current = np.array([[dataA[i]['X_Value']]])
-                y_true_current = np.array([[dataA[i]['Z_Label']]])
-                Z1 = x_current @ W1 + bias1
-                A1 = sigmoid(Z1)
-                Z2 = A1 @ W2 + bias2
-                A2 = sigmoid(Z2)
-                total_loss += 0.5 * np.sum((y_true_current - A2)**2) # Use np.sum for scalar loss
-            avg_loss = total_loss / len(dataA)
-            print(f"Epoch {epoch + 1}/{num_epochs}, Average Loss: {avg_loss:.6f}")
-    
+
+        total_loss = 0
+        for i in range(len(dataA)):
+            x_current = np.array([[dataA[i]['X_Value']]])
+            y_true_current = np.array([[dataA[i]['Z_Label']]])
+            Z1 = x_current @ W1 + bias1
+            A1 = sigmoid(Z1)
+            Z2 = A1 @ W2 + bias2
+            A2 = sigmoid(Z2)
+            total_loss += 0.5 * np.sum((y_true_current - A2)**2) # Use np.sum for scalar loss
+
+        avg_loss = total_loss / len(dataA)
+        print(f"Epoch {epoch + 1}/{num_epochs}, Average Loss: {avg_loss:.6f}, Epoch loss: {epoch_loss}")
+
+        if avg_loss < 0.001:
+            print(f"Average loss is {avg_loss}, less than threshold 0.001. Terminating training.\n")
+            break
+        
     # Generate some test data:
-    test_array = gen_test_data(15)
-    print("Test array generated: \n")
-    print(test_array)
+    test_array = gen_test_data(args.test_datapoints)
 
     print("\n--- Running network on test data ---")
     res1 = run_network(test_array, W1, bias1, W2, bias2)
