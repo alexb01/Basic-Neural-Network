@@ -45,10 +45,12 @@ class neural_net:
     def _forward_pass(self, X):
         self.cache = {}
 
-        A_prev = X
+        A = X
         self.cache['A0'] = X
 
         for l in range(1,self.num_layers):
+            A_prev = A
+
             W = self.parameters[f'W{l}']
             b = self.parameters[f'b{l}']
 
@@ -62,11 +64,16 @@ class neural_net:
             self.cache[f'Z{l}'] = Z
             self.cache[f'A{l}'] = A
 
-            A_prev = A
-
-        return self.cache['A3']
+        return A
 
 
-    def _backprop(self, X, Y):
+    def _backprop(self, y_hat, y_true):
+        L = self._calcloss(y_hat,y_true)
 
+        
+
+
+    def _calcloss(self, y_hat, y_true):
+        self.cache['BCE'] = np.mean(-(y_true * np.log(y_hat) + (1 - y_true) * np.log(1-y_hat)))
+        self.cache['MSE'] = np.mean(0.5 * (y_hat - y_true) ** 2)
     
