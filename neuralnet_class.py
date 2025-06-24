@@ -59,10 +59,10 @@ class neural_net:
 
             if l == self.num_layers - 1:
                 A = self._sigmoid(Z)
-                self.cache[f'activation{l}'] = 'sigmoid'
+                self.parameters[f'activation{l}'] = 'sigmoid'
             else:
                 A = self._relu(Z)
-                self.cache[f'activation{l}'] = 'relu'
+                self.parameters[f'activation{l}'] = 'relu'
 
             self.cache[f'Z{l}'] = Z
             self.cache[f'A{l}'] = A
@@ -74,22 +74,24 @@ class neural_net:
         L = self._calcloss(y_hat,y_true)
         dLdZ = {}
         dLdA = {}
-        dWdZ = {}
+        dLdW = {}
         dLdb = {}
 
         for l in range(self.num_layers-1,0,-1):
             if l == self.num_layers - 1 and 'BCE' in self.cache:
-                dLdZ[f'Z{l}'] = (y_hat - y_true) * self._d_sigmoid(self.cache['Z{l}'])
-                dLdA[f'A{l}'] = 
-            elif l < self.num_layers - 1:
-                dLdZ[f'Z{l}'] = 
+                dLdZ[f'dLdZ{l}'] = (y_hat - y_true) * self._d_sigmoid(self.cache[f'Z{l}'])
+                dLdA[f'dLdA{l}'] = (y_hat - y_true)
+                dLdA[f'dLdA{l-1}'] = dLdZ[f'dLdZ{l}'] @ self.parameters[f'W{l}']
+            elif l < self.num_layers - 1 and self.parameters[f'activation{l}'] == 'relu':
+                dLdZ[f'dLdZ{l}'] = dLdA[f'dLdA{l+1}']
+                dLdA[f'dLdA{l}'] = dLdZ[f'dLdZ{l+1}'] @ self.parameters[f'W{l+1}']
             else:
                 # If this runs, either the loss type was changed from BCE to something else without accounting for it,
                 # or _calcloss() wasn't called somehow.
                 print("Only code for binary cross entropy has been written, but self.cache doesn't have stored BCE values. Exiting program.")
                 sys.exit()
                 
-            dWdZ[f'W{l}'] = self.cache[f'A{l}'] @ dLdZ[f'{l}']
+            dLdW[f'dW{l}'] = self.cache[f'A{l}'] @ dLdZ[f'{l}']
 
 
     def _calcloss(self, y_hat, y_true):
