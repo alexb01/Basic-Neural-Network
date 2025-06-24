@@ -6,7 +6,7 @@ import argparse
 
 # Network dimensions
 input_dim = 1
-hidden_layer_dim = 10
+hidden_layer_dim = 30
 output_dim = 1
 
 
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     dataA = np.array(dataA_list, dtype={'names': ('X_Value', 'Z_Label'), 'formats': ('f8', 'i4')})
 
 
-    print(f"Training for {num_epochs} epochs with learning rate {learning_rate}\n")
+    print(f"Training for {num_epochs} epochs with learning rate {learning_rate} and {hidden_layer_dim} hidden layers")
     for epoch in range(num_epochs+1):
     # Pass the weights/biases by reference, as train_network modifies them
     # (remove .copy() if you want to modify in place, which is common for training)
