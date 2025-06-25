@@ -85,7 +85,18 @@ class neural_net:
             'dLdb': {}
         }
 
-        y_true = y_true.reshape(-1,1)
+        if y_true.ndim == 1 and y_true.shape[0] == y_hat.shape[0]:
+            # 1D array with correct length - reshape to column vector
+            y_true = y_true.reshape(-1, 1)
+        elif y_true.shape[0] != y_hat.shape[0]:
+            # Different number of samples
+            print(f'self._backprop() Error: y_hat has {y_hat.shape[0]} samples, y_true has {y_true.shape[0]} samples. Exiting.\n')
+            sys.exit()
+        elif y_true.ndim > 1 and y_true.shape[1] != 1:
+            # 2D but not a column vector
+            print(f'self._backprop() Error: y_true should be a column vector, got shape {y_true.shape}. Exiting.\n')
+            sys.exit()
+
         # Start from output layer and work backwards
         for l in range(self.num_layers-1, 0, -1):
             if l == self.num_layers - 1:
@@ -149,7 +160,7 @@ class neural_net:
 
                 batch_grad = self._backprop(y_hat, current_batch_y)
 
-                self._update_params(batch_grad,learning_rate=0.01)
+                self._update_params(batch_grad, learning_rate=0.0001)
 
                 batch_loss = self._calcloss(y_hat, current_batch_y)
                 total_epoch_loss += batch_loss
