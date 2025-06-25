@@ -22,7 +22,7 @@ class neural_net:
             n_in = self.layers[l-1]
             n_out = self.layers[l]
 
-            params[weight_key] = np.random.randn(n_in,n_out) * np.sqrt(1.0 / (n_in))
+            params[weight_key] = np.random.randn(n_in,n_out) * np.sqrt(1.0 / (n_in + n_out))
             params[bias_key] = np.zeros((1,n_out))
 
         return params
@@ -66,7 +66,6 @@ class neural_net:
             else:
                 A = self._relu(Z)
                 self.cache[f'activation{l}'] = 'relu'
-                
 
             self.cache[f'Z{l}'] = Z
             self.cache[f'A{l}'] = A
@@ -85,7 +84,7 @@ class neural_net:
             'dLdb': {}
         }
 
-        if y_true.ndim == 1 and y_true.shape[0] == y_hat.shape[0]:
+        if y_true.shape == (y_hat.shape[0],):  # Only 1D arrays like (200,)
             # 1D array with correct length - reshape to column vector
             y_true = y_true.reshape(-1, 1)
         elif y_true.shape[0] != y_hat.shape[0]:
@@ -126,12 +125,13 @@ class neural_net:
 
 
     def _calcloss(self, y_hat, y_true):
+        self.cache['MSE'] = np.mean(0.5 * (y_hat - y_true) ** 2)
+        
         epsilon = 1e-15
         y_hat_clipped = np.clip(y_hat, epsilon, 1 - epsilon)
-
         self.cache['BCE'] = -np.mean(y_true * np.log(y_hat_clipped) + (1 - y_true) * np.log(1 - y_hat_clipped))
         # self.cache['MSE'] = np.mean(0.5 * (y_hat - y_true) ** 2)
-        return self.cache['BCE']
+        return self.cache['BCE'] # if self.cache['activation1'] == 'relu' else self.cache['MSE']
     
 
     def train_network(self, X, y, epochs=500, batch_size=32):
@@ -139,6 +139,11 @@ class neural_net:
         num_batches = (num_samples + batch_size - 1) // batch_size
 
         leftover_datapoints = num_samples % batch_size
+        
+        epoch_yhat_max = 0.0
+        near_zero = 0
+        middle = 0
+        near_one = 0
 
         for epoch in range(epochs):
             total_epoch_loss = 0
@@ -146,6 +151,8 @@ class neural_net:
             shuffled_indices = np.random.permutation(num_samples)
             shuffled_X = X[shuffled_indices]
             shuffled_y = y[shuffled_indices]
+
+            batch_yhat_max = 0.0
 
             for i in range(num_batches):
                 # i represents each batch
@@ -157,18 +164,28 @@ class neural_net:
                 current_batch_size = len(current_batch_X)
 
                 y_hat = self._forward_pass(current_batch_X)
+                batch_yhat_max = max(batch_yhat_max, np.max(y_hat))
 
                 batch_grad = self._backprop(y_hat, current_batch_y)
 
-                self._update_params(batch_grad, learning_rate=0.0001)
+                self._update_params(batch_grad, learning_rate=0.01)
 
                 batch_loss = self._calcloss(y_hat, current_batch_y)
                 total_epoch_loss += batch_loss
-            
+
+                near_zero += np.sum((y_hat >= 0) & (y_hat <= 0.1))
+                middle += np.sum((y_hat > 0.1) & (y_hat < 0.9))
+                near_one += np.sum((y_hat >= 0.9) & (y_hat <= 1))
+
+                accuracy = np.mean((y_hat > 0.5) == (current_batch_y > 0.5))
+
+            epoch_yhat_max = max(epoch_yhat_max, batch_yhat_max)
+
             if epoch % 50 == 0:
                 avg_loss = total_epoch_loss / num_batches
-                print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}")
+                print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}, Accuracy: {accuracy}")
+                print(f"Near 0: {100 * near_zero / (near_zero + middle + near_one):.2f}%, Middle: {100 * middle / (near_zero + middle + near_one):.2f}%, Near 1: {100 * near_one / (near_zero + middle + near_one):.2f}%")
 
                 
-net1 = neural_net([2,10,10,10,1])
-moons_X, moons_y = make_moons(n_samples=200, noise=0.15, random_state=1)
+net1 = neural_net([2,16,4,1])
+moons_X, moons_y = make_moons(n_samples=5000, noise=0.15, random_state=1)
