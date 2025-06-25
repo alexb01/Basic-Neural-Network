@@ -66,6 +66,7 @@ class neural_net:
             else:
                 A = self._relu(Z)
                 self.cache[f'activation{l}'] = 'relu'
+                
 
             self.cache[f'Z{l}'] = Z
             self.cache[f'A{l}'] = A
@@ -73,7 +74,7 @@ class neural_net:
         return A
 
 
- def _backprop(self, y_hat, y_true):
+    def _backprop(self, y_hat, y_true):
         m = y_hat.shape[0]  # batch size
         L = self._calcloss(y_hat, y_true)
         
@@ -84,6 +85,7 @@ class neural_net:
             'dLdb': {}
         }
 
+        y_true = y_true.reshape(-1,1)
         # Start from output layer and work backwards
         for l in range(self.num_layers-1, 0, -1):
             if l == self.num_layers - 1:
@@ -95,7 +97,6 @@ class neural_net:
                     gradients['dLdZ'][l] = gradients['dLdA'][l] * self._d_relu(self.cache[f'Z{l}'])
                 else:
                     gradients['dLdZ'][l] = gradients['dLdA'][l] * self._d_sigmoid(self.cache[f'Z{l}'])
-
             # Compute weight and bias gradients
             gradients['dLdW'][l] = self.cache[f'A{l-1}'].T @ gradients['dLdZ'][l]
             gradients['dLdb'][l] = np.sum(gradients['dLdZ'][l], axis=0, keepdims=True)
@@ -124,7 +125,6 @@ class neural_net:
 
     def train_network(self, X, y, epochs=500, batch_size=32):
         num_samples = len(X)
-        print(f"Num_samples: {num_samples}\n")
         num_batches = (num_samples + batch_size - 1) // batch_size
 
         leftover_datapoints = num_samples % batch_size
@@ -149,15 +149,15 @@ class neural_net:
 
                 batch_grad = self._backprop(y_hat, current_batch_y)
 
-                self._update_params(batch_grad)
+                self._update_params(batch_grad,learning_rate=0.01)
 
                 batch_loss = self._calcloss(y_hat, current_batch_y)
                 total_epoch_loss += batch_loss
             
             if epoch % 50 == 0:
                 avg_loss = total_epoch_loss / num_batches
-                print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}")
+                print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}")
 
                 
 net1 = neural_net([2,10,10,10,1])
-moons1 = make_moons(n_samples=200, noise=0.15, random_state=42)
+moons_X, moons_y = make_moons(n_samples=200, noise=0.15, random_state=1)
