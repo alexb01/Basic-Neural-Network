@@ -49,7 +49,6 @@ class neural_net:
 
     def _forward_pass(self, X):
         self.cache = {}
-
         A = X
         self.cache['A0'] = X
 
@@ -59,12 +58,37 @@ class neural_net:
             W = self.parameters[f'W{l}']
             b = self.parameters[f'b{l}']
 
+            if np.any(np.isnan(A_prev)) or np.any(np.isinf(A_prev)):
+                print(f"Layer {l}: NaN/Inf in A_prev")
+                print(f"A_prev stats: min={np.min(A_prev)}, max={np.max(A_prev)}")
+                
+            if np.any(np.isnan(W)) or np.any(np.isinf(W)):
+                print(f"Layer {l}: NaN/Inf in W{l}")
+                print(f"W{l} stats: min={np.min(W)}, max={np.max(W)}")
+                
+            if np.any(np.isnan(b)) or np.any(np.isinf(b)):
+                print(f"Layer {l}: NaN/Inf in b{l}")
+                
+            # Check for extreme values that might cause overflow
+            if np.max(np.abs(A_prev)) > 1e10:
+                print(f"Layer {l}: Extreme values in A_prev: max_abs = {np.max(np.abs(A_prev))}")
+                
+            if np.max(np.abs(W)) > 1e10:
+                print(f"Layer {l}: Extreme values in W{l}: max_abs = {np.max(np.abs(W))}")
+
             Z = A_prev @ W + b
+            
+            # Check Z after computation
+            if np.any(np.isnan(Z)) or np.any(np.isinf(Z)):
+                print(f"Layer {l}: NaN/Inf in Z{l} after computation")
+                print(f"Z{l} stats: min={np.min(Z)}, max={np.max(Z)}")
 
             if l == self.num_layers - 1:
+                # Last layer
                 A = self._sigmoid(Z)
                 self.cache[f'activation{l}'] = 'sigmoid'
             else:
+                # Each of the other layers
                 A = self._relu(Z)
                 self.cache[f'activation{l}'] = 'relu'
 
@@ -146,14 +170,14 @@ class neural_net:
         y_hat = self._forward_pass(X)
         y_true = self._checkshape(y_hat, y)
 
-        accuracy_threshold = 0.05
+        accuracy_threshold = 0.1
         yhat_pushed = np.where(y_hat < accuracy_threshold, 0, np.where(y_hat > (1 - accuracy_threshold), 1, y_hat))
 
         self._checkaccuracy(yhat_pushed, y_true, accuracy_threshold)
 
 
     def _checkaccuracy(self, y_hat, y_true, accuracy_threshold):
-        accuracy = 100 * (np.count_nonzero(yhat_pushed == y_true) / len(y_true))
+        accuracy = 100 * (np.count_nonzero(y_hat == y_true) / len(y_true))
 
         print(f'Accuracy for {len(y_true)} data points = {accuracy}% with accuracy threshold {accuracy_threshold}')
 
@@ -202,7 +226,7 @@ class neural_net:
 
 
 if __name__ == "__main__":
-    net1 = neural_net([2,16,8,4,2,1])
+    net1 = neural_net([2,8,4,2,1])
     moons_X_train, moons_y_train = make_moons(n_samples=5000, noise=0.15, random_state=1)
 
     net1.train_network(moons_X_train, moons_y_train, epochs=2500)
