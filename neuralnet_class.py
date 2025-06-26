@@ -4,6 +4,8 @@ import os
 import csv
 import sys
 from sklearn.datasets import make_moons
+import ast
+import argparse
 
 class neural_net:
     def __init__(self,layer_dims):
@@ -12,6 +14,7 @@ class neural_net:
         print(f'Initializing network with layer dimensions {layer_dims}')
         self.num_layers = len(layer_dims)
         self.parameters = self._initialize_parameters()
+        self.accuracy_cache = {}
 
     
     def _initialize_parameters(self):
@@ -144,7 +147,18 @@ class neural_net:
             
             # Compute gradient w.r.t. previous layer's activations (except for input layer)
             if l > 1:
+                if np.any(np.isnan(gradients['dLdZ'][l])) or np.any(np.isinf(gradients['dLdZ'][l])):
+                    print(f"Layer {l}:")
+                    print(f"dLdZ[{l}] stats: min={np.min(gradients['dLdZ'][l])}, max={np.max(gradients['dLdZ'][l])}")
+                    print(f"W{l} stats: min={np.min(self.parameters[f'W{l}'])}, max={np.max(self.parameters[f'W{l}'])}")
+                    print(f"dLdZ has NaN: {np.any(np.isnan(gradients['dLdZ'][l]))}")
+                    print(f"dLdZ has inf: {np.any(np.isinf(gradients['dLdZ'][l]))}")
+                
                 gradients['dLdA'][l-1] = gradients['dLdZ'][l] @ self.parameters[f'W{l}'].T
+                
+                if np.any(np.isnan(gradients['dLdA'][l-1])) or np.any(np.isinf(gradients['dLdA'][l-1])):
+                    print(f"After matmul - dLdA[{l-1}] has NaN: {np.any(np.isnan(gradients['dLdA'][l-1]))}")
+                    print(f"After matmul - dLdA[{l-1}] has inf: {np.any(np.isinf(gradients['dLdA'][l-1]))}")
 
         return gradients
 
@@ -170,25 +184,26 @@ class neural_net:
         y_hat = self._forward_pass(X)
         y_true = self._checkshape(y_hat, y)
 
-        accuracy_threshold = 0.1
-        yhat_pushed = np.where(y_hat < accuracy_threshold, 0, np.where(y_hat > (1 - accuracy_threshold), 1, y_hat))
+        # 3 to make it 3x wider than the accuracy percentage as a decimal.
+        self.accuracy_cache['accuracy_threshold'] = 3 * self.accuracy_cache['middle'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one'])
+        yhat_pushed = np.where(y_hat < self.accuracy_cache['accuracy_threshold'], 0, np.where(y_hat > (1 - self.accuracy_cache['accuracy_threshold']), 1, y_hat))
 
-        self._checkaccuracy(yhat_pushed, y_true, accuracy_threshold)
+        self._checkaccuracy(yhat_pushed, y_true, self.accuracy_cache['accuracy_threshold'])
 
 
     def _checkaccuracy(self, y_hat, y_true, accuracy_threshold):
         accuracy = 100 * (np.count_nonzero(y_hat == y_true) / len(y_true))
 
-        print(f'Accuracy for {len(y_true)} data points = {accuracy}% with accuracy threshold {accuracy_threshold}')
+        print(f'Accuracy for {len(y_true)} data points = {accuracy:.2f}% with accuracy threshold {accuracy_threshold}')
 
 
     def train_network(self, X, y, epochs=500, batch_size=32):
         num_samples = len(X)
         num_batches = (num_samples + batch_size - 1) // batch_size
         
-        near_zero = 0
-        middle = 0
-        near_one = 0
+        self.accuracy_cache['near_zero'] = 0
+        self.accuracy_cache['middle'] = 0
+        self.accuracy_cache['near_one'] = 0
 
         for epoch in range(epochs):
             total_epoch_loss = 0
@@ -210,27 +225,51 @@ class neural_net:
 
                 batch_grad = self._backprop(y_hat, current_batch_y)
 
-                self._update_params(batch_grad, learning_rate=0.05)
+                self._update_params(batch_grad, learning_rate=0.01)
 
                 batch_loss = self._calcloss(y_hat, current_batch_y)
                 total_epoch_loss += batch_loss
 
-                near_zero += np.sum((y_hat >= 0) & (y_hat <= 0.1))
-                middle += np.sum((y_hat > 0.1) & (y_hat < 0.9))
-                near_one += np.sum((y_hat >= 0.9) & (y_hat <= 1))
+                self.accuracy_cache['near_zero'] += np.sum((y_hat >= 0) & (y_hat <= 0.1))
+                self.accuracy_cache['middle'] += np.sum((y_hat > 0.1) & (y_hat < 0.9))
+                self.accuracy_cache['near_one'] += np.sum((y_hat >= 0.9) & (y_hat <= 1))
 
             if epoch % 50 == 0:
                 avg_loss = total_epoch_loss / num_batches
                 print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}")
-                print(f"Near 0: {100 * near_zero / (near_zero + middle + near_one):.2f}%, Middle: {100 * middle / (near_zero + middle + near_one):.2f}%, Near 1: {100 * near_one / (near_zero + middle + near_one):.2f}%")
+                print(f"Near 0: {100 * self.accuracy_cache['near_zero'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one']):.2f}%, Middle: {100 * self.accuracy_cache['middle'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one']):.2f}%, Near 1: {100 * self.accuracy_cache['near_one'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one']):.2f}%")
 
 
 if __name__ == "__main__":
-    net1 = neural_net([2,8,4,2,1])
-    moons_X_train, moons_y_train = make_moons(n_samples=5000, noise=0.15, random_state=1)
+    print("Program start:")
 
-    net1.train_network(moons_X_train, moons_y_train, epochs=2500)
+    # --- Parse arguments ---
+    parser = argparse.ArgumentParser(description="A neural network class.")
+    parser.add_argument("--network_dims", type=str, default="[2,10,1]", help="Optional: Network layer dimensions as \"[2,10,1]\"")
+    parser.add_argument("--num_epochs", type=int, default=1000, help="Optional: The number of training epochs.")
+    parser.add_argument("--num_train_samples", type=int, default=1000, help="Optional: The number of training samples.")
+    parser.add_argument("--num_test_samples", type=int, default=200, help="Optional: The number of test samples.")
+    parser.add_argument("--noise", type=float, default=0.15, help="Optional: Make_moons noise.")
+    # parser.add_argument("l_rate", type=float, default=0.05, help="The learning rate for the network")
+    args = parser.parse_args()
 
-    moons_X_test, moons_y_test = make_moons(n_samples=1000, noise=0.15, random_state=115)
+    # Convert string to list
+    try:
+        network_dims = ast.literal_eval(args.network_dims)
+        num_epochs = args.num_epochs
+        num_train_samples = args.num_train_samples
+        num_test_samples = args.num_test_samples
+        mm_noise = args.noise
+        print(f'{network_dims=}\n{num_epochs=}\n{num_train_samples=}\n{num_test_samples=}\n{mm_noise=}\n')
+    except:
+        print("Invalid argument(s). Exiting.")
+        sys.exit()
+
+    net1 = neural_net(network_dims)
+    moons_X_train, moons_y_train = make_moons(n_samples=num_train_samples, noise=mm_noise, random_state=1)
+
+    net1.train_network(moons_X_train, moons_y_train, epochs=num_epochs)
+
+    moons_X_test, moons_y_test = make_moons(n_samples=num_test_samples, noise=mm_noise, random_state=115)
 
     net1.test_network(moons_X_test, moons_y_test)
