@@ -9,6 +9,7 @@ class neural_net:
     def __init__(self,layer_dims):
         # [Input layer dimension [0], hidden layer dimension [1], output layer dimension [2]]
         self.layers = layer_dims
+        print(f'Initializing network with layer dimensions {layer_dims}')
         self.num_layers = len(layer_dims)
         self.parameters = self._initialize_parameters()
 
@@ -22,7 +23,7 @@ class neural_net:
             n_in = self.layers[l-1]
             n_out = self.layers[l]
 
-            params[weight_key] = np.random.randn(n_in,n_out) * np.sqrt(1.0 / (n_in + n_out))
+            params[weight_key] = np.random.randn(n_in,n_out) * np.sqrt(2.0 / (n_in))
             params[bias_key] = np.zeros((1,n_out))
 
         return params
@@ -73,17 +74,7 @@ class neural_net:
         return A
 
 
-    def _backprop(self, y_hat, y_true):
-        m = y_hat.shape[0]  # batch size
-        L = self._calcloss(y_hat, y_true)
-        
-        gradients = {
-            'dLdZ': {},
-            'dLdA': {},
-            'dLdW': {}, 
-            'dLdb': {}
-        }
-
+    def _checkshape(self, y_hat, y_true):
         if y_true.shape == (y_hat.shape[0],):  # Only 1D arrays like (200,)
             # 1D array with correct length - reshape to column vector
             y_true = y_true.reshape(-1, 1)
@@ -95,6 +86,22 @@ class neural_net:
             # 2D but not a column vector
             print(f'self._backprop() Error: y_true should be a column vector, got shape {y_true.shape}. Exiting.\n')
             sys.exit()
+        
+        return y_true
+
+
+    def _backprop(self, y_hat, y_true):
+        m = y_hat.shape[0]  # batch size
+        L = self._calcloss(y_hat, y_true)
+        
+        gradients = {
+            'dLdZ': {},
+            'dLdA': {},
+            'dLdW': {}, 
+            'dLdb': {}
+        }
+
+        y_true = self._checkshape(y_hat,y_true)
 
         # Start from output layer and work backwards
         for l in range(self.num_layers-1, 0, -1):
@@ -125,22 +132,36 @@ class neural_net:
 
 
     def _calcloss(self, y_hat, y_true):
-        self.cache['MSE'] = np.mean(0.5 * (y_hat - y_true) ** 2)
+        # self.cache['MSE'] = np.mean(0.5 * (y_hat - y_true) ** 2)
+        y_true = self._checkshape(y_hat,y_true)
         
         epsilon = 1e-15
         y_hat_clipped = np.clip(y_hat, epsilon, 1 - epsilon)
         self.cache['BCE'] = -np.mean(y_true * np.log(y_hat_clipped) + (1 - y_true) * np.log(1 - y_hat_clipped))
-        # self.cache['MSE'] = np.mean(0.5 * (y_hat - y_true) ** 2)
+        
         return self.cache['BCE'] # if self.cache['activation1'] == 'relu' else self.cache['MSE']
-    
+
+
+    def test_network(self, X, y):
+        y_hat = self._forward_pass(X)
+        y_true = self._checkshape(y_hat, y)
+
+        accuracy_threshold = 0.05
+        yhat_pushed = np.where(y_hat < accuracy_threshold, 0, np.where(y_hat > (1 - accuracy_threshold), 1, y_hat))
+
+        self._checkaccuracy(yhat_pushed, y_true, accuracy_threshold)
+
+
+    def _checkaccuracy(self, y_hat, y_true, accuracy_threshold):
+        accuracy = 100 * (np.count_nonzero(yhat_pushed == y_true) / len(y_true))
+
+        print(f'Accuracy for {len(y_true)} data points = {accuracy}% with accuracy threshold {accuracy_threshold}')
+
 
     def train_network(self, X, y, epochs=500, batch_size=32):
         num_samples = len(X)
         num_batches = (num_samples + batch_size - 1) // batch_size
-
-        leftover_datapoints = num_samples % batch_size
         
-        epoch_yhat_max = 0.0
         near_zero = 0
         middle = 0
         near_one = 0
@@ -152,8 +173,6 @@ class neural_net:
             shuffled_X = X[shuffled_indices]
             shuffled_y = y[shuffled_indices]
 
-            batch_yhat_max = 0.0
-
             for i in range(num_batches):
                 # i represents each batch
                 start_idx = i * batch_size
@@ -164,11 +183,10 @@ class neural_net:
                 current_batch_size = len(current_batch_X)
 
                 y_hat = self._forward_pass(current_batch_X)
-                batch_yhat_max = max(batch_yhat_max, np.max(y_hat))
 
                 batch_grad = self._backprop(y_hat, current_batch_y)
 
-                self._update_params(batch_grad, learning_rate=0.01)
+                self._update_params(batch_grad, learning_rate=0.05)
 
                 batch_loss = self._calcloss(y_hat, current_batch_y)
                 total_epoch_loss += batch_loss
@@ -177,15 +195,18 @@ class neural_net:
                 middle += np.sum((y_hat > 0.1) & (y_hat < 0.9))
                 near_one += np.sum((y_hat >= 0.9) & (y_hat <= 1))
 
-                accuracy = np.mean((y_hat > 0.5) == (current_batch_y > 0.5))
-
-            epoch_yhat_max = max(epoch_yhat_max, batch_yhat_max)
-
             if epoch % 50 == 0:
                 avg_loss = total_epoch_loss / num_batches
-                print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}, Accuracy: {accuracy}")
+                print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}")
                 print(f"Near 0: {100 * near_zero / (near_zero + middle + near_one):.2f}%, Middle: {100 * middle / (near_zero + middle + near_one):.2f}%, Near 1: {100 * near_one / (near_zero + middle + near_one):.2f}%")
 
-                
-net1 = neural_net([2,16,4,1])
-moons_X, moons_y = make_moons(n_samples=5000, noise=0.15, random_state=1)
+
+if __name__ == "__main__":
+    net1 = neural_net([2,16,8,4,2,1])
+    moons_X_train, moons_y_train = make_moons(n_samples=5000, noise=0.15, random_state=1)
+
+    net1.train_network(moons_X_train, moons_y_train, epochs=2500)
+
+    moons_X_test, moons_y_test = make_moons(n_samples=1000, noise=0.15, random_state=115)
+
+    net1.test_network(moons_X_test, moons_y_test)
