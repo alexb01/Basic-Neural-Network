@@ -6,6 +6,7 @@ import sys
 from sklearn.datasets import make_moons
 import ast
 import argparse
+import matplotlib.pyplot as plt
 
 class neural_net:
     def __init__(self,layer_dims):
@@ -197,7 +198,7 @@ class neural_net:
         print(f'Accuracy for {len(y_true)} data points = {accuracy:.2f}% with accuracy threshold {accuracy_threshold}')
 
 
-    def train_network(self, X, y, epochs=500, batch_size=32):
+    def train_network(self, X, y, epochs=500, batch_size=32, learning_rate=0.01):
         num_samples = len(X)
         num_batches = (num_samples + batch_size - 1) // batch_size
         
@@ -225,7 +226,7 @@ class neural_net:
 
                 batch_grad = self._backprop(y_hat, current_batch_y)
 
-                self._update_params(batch_grad, learning_rate=0.01)
+                self._update_params(batch_grad, learning_rate=learning_rate)
 
                 batch_loss = self._calcloss(y_hat, current_batch_y)
                 total_epoch_loss += batch_loss
@@ -238,6 +239,161 @@ class neural_net:
                 avg_loss = total_epoch_loss / num_batches
                 print(f"Epoch {epoch}, Average Loss: {avg_loss:.6f}, Batch Loss: {batch_loss:.6f}")
                 print(f"Near 0: {100 * self.accuracy_cache['near_zero'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one']):.2f}%, Middle: {100 * self.accuracy_cache['middle'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one']):.2f}%, Near 1: {100 * self.accuracy_cache['near_one'] / (self.accuracy_cache['near_zero'] + self.accuracy_cache['middle'] + self.accuracy_cache['near_one']):.2f}%")
+                plot_decision_boundary_live(self, X[:500], y[:500], f"Epoch {epoch}")
+
+
+def plot_decision_boundary(network, X, y, title="Decision Boundary"):
+    """
+    Plot the decision boundary of a neural network
+    
+    Args:
+        network: Your trained neural_net instance
+        X: Input data (n_samples, 2)
+        y: True labels (n_samples,)
+        title: Plot title
+    """
+    
+    # Create a mesh grid covering the data range
+    h = 0.02  # Step size in the mesh
+    x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+    y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+    
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                        np.arange(y_min, y_max, h))
+    
+    # Create points to classify
+    mesh_points = np.c_[xx.ravel(), yy.ravel()]
+    
+    # Get predictions for all mesh points
+    Z = network._forward_pass(mesh_points)
+    Z = Z.reshape(xx.shape)
+    
+    # Create the plot
+    plt.figure(figsize=(12, 5))
+    
+    # Plot 1: Decision boundary with contour
+    plt.subplot(1, 2, 1)
+    plt.contourf(xx, yy, Z, levels=50, alpha=0.8, cmap='RdYlBu')
+    plt.colorbar(label='Prediction Probability')
+    
+    # Overlay the data points
+    scatter = plt.scatter(X[:, 0], X[:, 1], c=y, cmap='RdYlBu', edgecolors='black')
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    plt.title(f'{title} - Probability Surface')
+    
+    # Plot 2: Decision boundary line
+    plt.subplot(1, 2, 2)
+    # Draw decision boundary at 0.5 threshold
+    plt.contour(xx, yy, Z, levels=[0.5], colors='black', linewidths=2, linestyles='--')
+    plt.contourf(xx, yy, Z, levels=[0, 0.5, 1], colors=['lightblue', 'lightcoral'], alpha=0.6)
+    
+    # Overlay the data points
+    colors = ['blue' if label == 0 else 'red' for label in y]
+    plt.scatter(X[:, 0], X[:, 1], c=colors, edgecolors='black', s=50)
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    plt.title(f'{title} - Decision Regions')
+    
+    plt.tight_layout()
+    plt.show(block=False)
+
+    plt.pause(0.25)  # Wait 5 seconds
+    plt.close()
+
+
+def plot_decision_boundary_live(self, X, y, title="Decision Boundary"):
+    """Version that updates existing plot"""
+    # First time: create the figure
+    if not hasattr(self, '_fig'):
+        plt.ion()  # Turn on interactive mode
+        self._fig, (self._ax1, self._ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Clear previous plots
+    self._ax1.clear()
+    self._ax2.clear()
+    
+    # Create mesh grid (same as before)
+    h = 0.02
+    x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+    y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+    
+    mesh_points = np.c_[xx.ravel(), yy.ravel()]
+    Z = self._forward_pass(mesh_points)
+    Z = Z.reshape(xx.shape)
+    
+    # Plot 1: Probability surface
+    self._ax1.contourf(xx, yy, Z, levels=50, alpha=0.8, cmap='RdYlBu')
+    self._ax1.scatter(X[:, 0], X[:, 1], c=y, cmap='RdYlBu', edgecolors='black')
+    self._ax1.set_title(f'{title} - Probability Surface')
+    self._ax1.set_xlabel('Feature 1')
+    self._ax1.set_ylabel('Feature 2')
+    
+    # Plot 2: Decision boundary
+    self._ax2.contour(xx, yy, Z, levels=[0.5], colors='black', linewidths=2, linestyles='--')
+    self._ax2.contourf(xx, yy, Z, levels=[0, 0.5, 1], colors=['lightblue', 'lightcoral'], alpha=0.6)
+    colors = ['blue' if label == 0 else 'red' for label in y]
+    self._ax2.scatter(X[:, 0], X[:, 1], c=colors, edgecolors='black', s=50)
+    self._ax2.set_title(f'{title} - Decision Regions')
+    self._ax2.set_xlabel('Feature 1')
+    self._ax2.set_ylabel('Feature 2')
+    
+    plt.tight_layout()
+    plt.draw()  # Update the display
+    plt.pause(0.01)  # Small pause to allow update
+
+
+def compare_boundaries(network, X_train, y_train, X_test, y_test):
+    """
+    Compare decision boundaries on training vs test data
+    """
+    plt.figure(figsize=(15, 5))
+    
+    # Combined data range for consistent mesh
+    X_all = np.vstack([X_train, X_test])
+    h = 0.02
+    x_min, x_max = X_all[:, 0].min() - 0.5, X_all[:, 0].max() + 0.5
+    y_min, y_max = X_all[:, 1].min() - 0.5, X_all[:, 1].max() + 0.5
+    
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                        np.arange(y_min, y_max, h))
+    
+    mesh_points = np.c_[xx.ravel(), yy.ravel()]
+    Z = network._forward_pass(mesh_points)
+    Z = Z.reshape(xx.shape)
+    
+    # Training data
+    plt.subplot(1, 3, 1)
+    plt.contourf(xx, yy, Z, levels=50, alpha=0.8, cmap='RdYlBu')
+    plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap='RdYlBu', edgecolors='black')
+    plt.title('Training Data')
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    
+    # Test data
+    plt.subplot(1, 3, 2)
+    plt.contourf(xx, yy, Z, levels=50, alpha=0.8, cmap='RdYlBu')
+    plt.scatter(X_test[:, 0], X_test[:, 1], c=y_test, cmap='RdYlBu', edgecolors='black')
+    plt.title('Test Data')
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    
+    # Decision boundary only
+    plt.subplot(1, 3, 3)
+    plt.contour(xx, yy, Z, levels=[0.5], colors='black', linewidths=3)
+    plt.contourf(xx, yy, Z, levels=[0, 0.5, 1], colors=['lightblue', 'lightcoral'], alpha=0.4)
+    plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap='RdYlBu', 
+                edgecolors='black', alpha=0.7, label='Train')
+    plt.scatter(X_test[:, 0], X_test[:, 1], c=y_test, cmap='RdYlBu', 
+                edgecolors='white', marker='^', s=60, label='Test')
+    plt.title('Decision Boundary')
+    plt.xlabel('Feature 1')
+    plt.ylabel('Feature 2')
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -250,6 +406,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_train_samples", type=int, default=1000, help="Optional: The number of training samples.")
     parser.add_argument("--num_test_samples", type=int, default=200, help="Optional: The number of test samples.")
     parser.add_argument("--noise", type=float, default=0.15, help="Optional: Make_moons noise.")
+    parser.add_argument("--learning_rate", type=float, default=0.01, help="Optional: Learning rate.")
     # parser.add_argument("l_rate", type=float, default=0.05, help="The learning rate for the network")
     args = parser.parse_args()
 
@@ -260,6 +417,7 @@ if __name__ == "__main__":
         num_train_samples = args.num_train_samples
         num_test_samples = args.num_test_samples
         mm_noise = args.noise
+        learning_rate = args.learning_rate
         print(f'{network_dims=}\n{num_epochs=}\n{num_train_samples=}\n{num_test_samples=}\n{mm_noise=}\n')
     except:
         print("Invalid argument(s). Exiting.")
@@ -268,8 +426,11 @@ if __name__ == "__main__":
     net1 = neural_net(network_dims)
     moons_X_train, moons_y_train = make_moons(n_samples=num_train_samples, noise=mm_noise, random_state=1)
 
-    net1.train_network(moons_X_train, moons_y_train, epochs=num_epochs)
+    net1.train_network(moons_X_train, moons_y_train, epochs=num_epochs, learning_rate=learning_rate)
 
     moons_X_test, moons_y_test = make_moons(n_samples=num_test_samples, noise=mm_noise, random_state=115)
 
     net1.test_network(moons_X_test, moons_y_test)
+
+    # plot_decision_boundary(net1, moons_X_train, moons_y_train)
+    # compare_boundaries(net1, moons_X_train, moons_y_train, moons_X_test, moons_y_test)
